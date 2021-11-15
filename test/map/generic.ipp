@@ -46,6 +46,12 @@ struct hash_conflictor
     std::size_t operator()(const conflictor& x) const { return x.v1; }
 };
 
+struct hash_conflictor_sorted
+{
+    std::size_t operator()(const conflictor& x) const { return __builtin_bitreverse64(x.v1); }
+};
+
+
 auto make_values_with_collisions(unsigned n)
 {
     auto gen   = make_generator();
@@ -180,6 +186,62 @@ TEST_CASE("iterator")
         for (const auto& x : s)
             CHECK(seen.insert(x.first).second);
         CHECK(seen.size() == s.size());
+    }
+
+    SECTION("begin at")
+    {
+        auto seen = std::unordered_set<unsigned>{};
+        decltype(v.begin()->first) startAt;
+
+        int n = 10;
+        for (const auto& x : v)
+        {
+            startAt = x.first;
+            seen.insert(x.first);
+            if (--n == 0) break;
+        }
+
+        CHECK(seen.size() == 10);
+        auto it = v.findIterator(startAt);
+        for (it++; it != v.end(); ++it)
+        {
+            CHECK(seen.count(it->first) == 0);
+            seen.insert(it->first);
+        }
+
+        CHECK(seen.size() == v.size());
+    }
+
+    SECTION("begin at not found")
+    {
+        auto seen = std::unordered_set<unsigned>{};
+        CHECK(v.findIterator(1121121) == v.end());
+    }
+
+    SECTION("begin at conflictor")
+    {
+        auto cv = MAP_T<conflictor, bool, hash_conflictor_sorted>();
+        conflictor ordering[100];
+
+        for (unsigned int i = 0; i < 100; ++i) {
+            cv = cv.set({i, 0}, true);
+            if ( i % 5 == 0 ) cv = cv.set({i, 1}, true);
+        }
+
+        auto cc = cv.begin();
+        for (unsigned int i = 0; i < 100; ++i) {
+            ordering[i] = cc->first;
+            ++cc;
+        }
+
+        for (unsigned int i = 0; i < 100; ++i) {
+            conflictor target = ordering[i];
+            auto it = cv.findIterator(target);
+            for (unsigned int j = i; j < 100; ++j) {
+                CHECK(it->first == ordering[j]);
+                ++it;
+            }
+        }
     }
 }
 

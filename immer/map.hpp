@@ -182,6 +182,21 @@ public:
         return {impl_, typename iterator::end_t{}};
     }
 
+
+    IMMER_NODISCARD iterator findIterator(const K& k) const
+    {
+        iterator seek = {impl_, {k, {}}};
+        if (seek != end() && key_equal{}(seek->first, k))
+            return seek;
+
+        return end();
+    }
+
+    IMMER_NODISCARD iterator beginAtOrAfter(const K& k) const
+    {
+        return {impl_, {k, {}}};
+    }
+
     /*!
      * Returns the number of elements in the container.  It does
      * not allocate memory and its complexity is @f$ O(1) @f$.

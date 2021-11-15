@@ -43,6 +43,52 @@ struct champ_iterator
         ensure_valid_();
     }
 
+    champ_iterator(const tree_t& v, const T& target)
+        :depth_{0}
+    {
+        using bitmap_t = typename get_bitmap_type<B>::type;
+        cur_ = end_ = nullptr;
+        path_[0] = &v.root;
+
+        auto node = v.root;
+        auto hash = Hash{}(target);
+
+        for (auto depth = count_t{}; depth < max_depth<B>; ++depth) {
+            auto bit = bitmap_t{1u} << (hash & mask<B>);
+            if (node->nodemap() & bit) {
+                auto offset = node->children_count(bit);
+                path_[depth+1] = node->children() + offset;
+
+                depth_      = depth + 1;
+                node        = node->children()[offset];
+                hash        = hash >> B;
+           } else if (node->datamap() & bit) {
+                auto offset = node->data_count(bit);
+                auto val    = node->values() + offset;
+
+                cur_ = val;
+                end_ = node->values() + node->data_count();
+                break;
+            } else {
+                ensure_valid_();
+                return;
+            }
+        }
+
+        if ( depth_ == max_depth<B> ) {
+            auto fst = node->collisions();
+            auto lst = fst + node->collision_count();
+            cur_ = end_ = lst;
+
+            for (; fst != lst; ++fst) {
+                if (Eq{}(*fst, target)) {
+                    cur_ = fst;
+                    return;
+                }
+            }
+        }
+    }
+
     champ_iterator(const tree_t& v, end_t)
         : cur_{nullptr}
         , end_{nullptr}
